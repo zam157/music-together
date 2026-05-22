@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import type { ApiConfig, RequestHeaders, FormattedTrack } from './base'
 import BaseProvider from './base'
+import { createWeapiEncryptedPayload } from '../../crypto'
 
 // eapi 相关常量
 const EAPI_KEY = 'e82ckenh8dichen8'
@@ -232,6 +233,8 @@ export default class NeteaseProvider extends BaseProvider {
   async handleEncode(api: ApiConfig): Promise<ApiConfig> {
     if (api.encode === 'netease_eapi') {
       return this.eapiEncrypt(api)
+    } else if (api.encode === 'netease_weapi') {
+      api.body = createWeapiEncryptedPayload(api.body as Record<string, any>)
     }
     return api
   }

@@ -9,6 +9,7 @@ import ncmApi from '@neteasecloudmusicapienhanced/api'
 import * as kugouAuth from './kugouAuthService.js'
 import * as tencentAuth from './tencentAuthService.js'
 import { logger } from '../utils/logger.js'
+import type NeteaseVoiceProvider from '../utils/meting/providers/netease-voice'
 
 /** AMLL LyricLine 格式（与 @applemusic-like-lyrics/core 一致，避免引入 client 依赖） */
 interface AmllLyricLine {
@@ -458,6 +459,15 @@ class MusicProvider {
         }))
       }
 
+      if (source === 'netease-voice') {
+        // TODO: 完成网易云声音歌单专辑搜索
+        // const meting = new Meting('netease')
+        // meting.format(false) // Important: don't format because format expects songs
+        // const raw = await withTimeout(meting.search(keyword, { limit, page, type: 10 } as any))
+        // if (!raw)
+          return []
+      }
+
       return []
     } catch (err) {
       logger.error(`Search album failed for ${source}:`, err)
@@ -553,6 +563,35 @@ class MusicProvider {
           creator: playlist.creator?.nickname || '',
           description: playlist.description || '',
         }))
+      }
+
+      if (source === 'netease-voice') {
+        const neteaseVoiceProvider = this.getInstance('netease-voice')
+        const raw = await withTimeout(neteaseVoiceProvider.search(keyword, { limit, page, type: 'playlist' }))
+        if (!raw) return []
+
+        let data: any
+        try {
+          data = JSON.parse(raw as string)
+        } catch {
+          return []
+        }
+
+        const playlists = data?.data?.resources
+        if (!Array.isArray(playlists))
+          return []
+        return playlists.map((playlist: any) => {
+          const baseInfo = playlist.baseInfo
+          return {
+            id: String(baseInfo.id),
+            name: baseInfo.name || 'Unknown Playlist',
+            cover: baseInfo.picUrl ? baseInfo.picUrl + '?imageView=&thumbnail=60y60&type=webp&rotate=0&tostatic=0' : '',
+            trackCount: baseInfo.programCount || 0,
+            source: 'netease-voice',
+            creator: baseInfo.dj?.nickname || '',
+            description: baseInfo.desc || '',
+          }
+        })
       }
 
       return []
@@ -758,7 +797,7 @@ class MusicProvider {
         } catch {
           /* 静默回退到 LRC */
         }
-      } else {
+      } else if (source === 'tencent') {
         // QQ 音乐：使用 Meting 默认流程
         const meting = this.getInstance(source)
         const raw = await withTimeout(meting.lyric(lyricId))
@@ -773,6 +812,25 @@ class MusicProvider {
             tlyric: (data.tlyric as string) || '',
             romalrc: '',
             yrc: '',
+          }
+        } catch {
+          return empty
+        }
+      } else if (source === 'netease-voice') {
+        // 网易云声音：使用 Meting 默认流程
+        const meting = this.getInstance(source)
+        const raw = await withTimeout(meting.lyric(lyricId))
+        if (raw === null || raw === undefined) {
+          logger.warn(`Lyric fetch timeout for ${source}: ${lyricId}`)
+          return empty
+        }
+        try {
+          const data = JSON.parse(raw as string)
+          result = {
+            lyric: (data?.lyric as string) || '',
+            tlyric: (data.tlyric?.lyric as string) || '',
+            romalrc: ((data.romalrc as Record<string, unknown> | undefined)?.lyric as string) || '',
+            yrc: (data.yrc?.lyric as string) || '',
           }
         } catch {
           return empty
@@ -874,6 +932,29 @@ class MusicProvider {
       const result = await this.fetchTencentPlaylist(playlistId, cacheKey, cookie)
       if (result.total > 0) return result
       logger.info(`Tencent native API returned empty for ${playlistId}, falling back to Meting`)
+    }
+
+    if (source === 'netease-voice') {
+      const neteaseVoiceMeting = this.getInstance('netease-voice')
+      const provider = neteaseVoiceMeting.provider as NeteaseVoiceProvider
+      const raw = await neteaseVoiceMeting._exec(provider.fetchProgramList(playlistId))
+      try {
+        const programs = JSON.parse(raw as string).data.programs
+        const ids: string[] = []
+        const tracks: Track[] = []
+        for (const p of programs) {
+          const track = this.rawToTrack(p, source)
+          tracks.push(track)
+          ids.push(track.sourceId)
+        }
+        this.registerTracks(tracks)
+        return {
+          ids,
+          total: programs.length
+        }
+      } catch {
+        return { ids: [], total: 0 }
+      }
     }
 
     // Fallback: use Meting raw mode
@@ -1303,7 +1384,7 @@ class MusicProvider {
       }
 
       case 'netease-voice': {
-        const baseInfo = s.baseInfo
+        const baseInfo = s.baseInfo || s
         return {
           id: nanoid(),
           title: baseInfo.name || 'Unknown',

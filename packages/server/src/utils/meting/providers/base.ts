@@ -83,7 +83,7 @@ export default class BaseProvider implements BaseProviderType {
   }
 
   /**
-   * 获取播放列表
+   * 歌单详情
    * @param {string} id 播放列表ID
    * @returns {ApiConfig} API 配置对象
    */

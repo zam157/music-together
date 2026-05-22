@@ -99,7 +99,8 @@ router.get(
         res.status(403).json({ error: 'Forbidden' })
         return
       }
-      cookie = authService.getUserCookie(identityUserId, source, roomId)
+      const targetSource = source === 'netease-voice' ? 'netease' : source // 网易云声音使用网易云账号体系
+      cookie = authService.getUserCookie(identityUserId, targetSource, roomId)
     }
 
     const result = await musicProvider.getPlaylistPage(source, id, limit, offset, total, cookie, type)
