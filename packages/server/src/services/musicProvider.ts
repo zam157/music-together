@@ -1,4 +1,4 @@
-import Meting from '@meting/core'
+import Meting from '../utils/meting/meting'
 import { get as kugouLrcGet, Format } from '@s4p/kugou-lrc'
 import type { KrcInfo } from '@s4p/kugou-lrc'
 import type { MusicSource, Track } from '@music-together/shared'
@@ -149,6 +149,7 @@ const SEARCH_PATHS: Record<MusicSource, string> = {
   netease: 'result.songs',
   tencent: 'data.song.list',
   kugou: 'data.info',
+  'netease-voice': 'data.resources',
 }
 
 // Path to song list in raw playlist API response per platform
@@ -156,6 +157,7 @@ const PLAYLIST_PATHS: Record<MusicSource, string> = {
   netease: 'playlist.tracks', // Not used (Netease uses ncmApi)
   tencent: 'data.cdlist.0.songlist', // JS arrays support string numeric index
   kugou: 'data.info',
+  'netease-voice': 'playlist.tracks',
 }
 
 // ---------------------------------------------------------------------------
@@ -663,6 +665,7 @@ class MusicProvider {
         meting = this.getInstance(source)
       }
       const raw = await withTimeout(meting.url(urlId, bitrate))
+      logger.info('Raw URL response:', { source, urlId, raw })
       if (raw === null || raw === undefined) {
         logger.warn(`URL fetch timeout for ${source}: ${urlId}`)
         return null
@@ -1296,6 +1299,25 @@ class MusicProvider {
           picId: String(s.hash),
           // privilege 位掩码: & 8 表示 VIP; pay_type > 0 也表示付费
           vip: ((s.privilege ?? 0) & 8) !== 0 || (s.pay_type ?? 0) > 0,
+        }
+      }
+
+      case 'netease-voice': {
+        const baseInfo = s.baseInfo
+        return {
+          id: nanoid(),
+          title: baseInfo.name || 'Unknown',
+          artist: baseInfo.mainSong?.artists?.map((i: any) => i.name) || ['Unknown'],
+          album: baseInfo.mainSong?.album?.name || '',
+          duration: Math.round((baseInfo.duration || 0) / 1000), // ms -> seconds
+          cover: baseInfo.coverUrl ? baseInfo.coverUrl + '?param=300y300' : '', // resolved via pic()
+          source,
+          sourceId: String(baseInfo.mainTrackId),
+          urlId: String(baseInfo.mainTrackId),
+          lyricId: String(baseInfo.id),
+          picId: String(baseInfo.coverId || ''),
+          // fee: 0=免费, 1=VIP, 4=付费专辑, 8=低音质免费
+          vip: s.fee === 1 || s.fee === 4 || s.privilege?.fee === 1 || s.privilege?.fee === 4,
         }
       }
 

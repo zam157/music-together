@@ -74,7 +74,7 @@ const trackSchema = z.object({
   album: z.string().max(500),
   duration: z.number().finite().nonnegative(),
   cover: z.string().max(2000),
-  source: z.enum(['netease', 'tencent', 'kugou']),
+  source: z.enum(['netease', 'tencent', 'kugou', 'netease-voice']),
   sourceId: z.string().max(200),
   urlId: z.string().max(200),
   lyricId: z.string().max(200).optional(),
@@ -111,7 +111,7 @@ export const chatMessageSchema = z.object({
 // REST API – Music routes
 // ---------------------------------------------------------------------------
 
-const musicSourceSchema = z.enum(['netease', 'tencent', 'kugou'])
+const musicSourceSchema = z.enum(['netease', 'tencent', 'kugou', 'netease-voice'])
 
 export const searchQuerySchema = z.object({
   source: musicSourceSchema,

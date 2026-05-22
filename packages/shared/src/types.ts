@@ -20,7 +20,7 @@ export const ERROR_CODE = {
 
 export type ErrorCode = (typeof ERROR_CODE)[keyof typeof ERROR_CODE]
 
-export type MusicSource = 'netease' | 'tencent' | 'kugou'
+export type MusicSource = 'netease' | 'tencent' | 'kugou' | 'netease-voice'
 
 export type AutoFallbackStatus = 'trying' | 'success' | 'failed'
 

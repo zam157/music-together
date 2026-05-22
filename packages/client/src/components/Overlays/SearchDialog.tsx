@@ -29,6 +29,7 @@ const SOURCES: { id: MusicSource; label: string }[] = [
   { id: 'netease', label: '网易云' },
   { id: 'tencent', label: 'QQ' },
   { id: 'kugou', label: '酷狗' },
+  { id: 'netease-voice', label: '网易云声音' },
 ]
 
 interface SearchDialogProps {
