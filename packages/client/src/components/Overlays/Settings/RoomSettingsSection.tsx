@@ -27,7 +27,7 @@ function getQualityLabel(quality: AudioQuality): string {
 }
 
 interface RoomSettingsSectionProps {
-  onUpdateSettings: (settings: { name?: string; password?: string | null; audioQuality?: AudioQuality }) => void
+  onUpdateSettings: (settings: { name?: string; password?: string | null; audioQuality?: AudioQuality; isPersistent?: boolean }) => void
 }
 
 export function RoomSettingsSection({ onUpdateSettings }: RoomSettingsSectionProps) {
@@ -254,6 +254,9 @@ export function RoomSettingsSection({ onUpdateSettings }: RoomSettingsSectionPro
           <h3 className="text-base font-semibold">房主设置</h3>
           <Separator className="mt-2 mb-4" />
 
+          <SettingRow label="房间持久化" description="开启后即使房间内无人，房间信息也会被保留">
+            <Switch checked={room?.isPersistent ?? false} onCheckedChange={(checked) => onUpdateSettings({ isPersistent: checked })} />
+          </SettingRow>
           <SettingRow label="房间密码" description="开启后需输入密码才能进入">
             <Switch checked={passwordEnabled} onCheckedChange={handlePasswordToggle} />
           </SettingRow>

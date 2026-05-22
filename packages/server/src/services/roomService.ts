@@ -78,6 +78,7 @@ export function createRoom(
       serverTimestamp: Date.now(),
     },
     playMode: 'loop-all',
+    isPersistent: false,
   }
 
   roomRepo.set(roomId, room)
@@ -167,8 +168,10 @@ export function leaveRoom(
 
   // If room is empty, schedule deletion after grace period
   if (room.users.length === 0) {
-    scheduleDeletion(roomId, io)
-    return { roomId, user, room, hostChanged: false, voteUpdated: false }
+    if (!room.isPersistent) {
+      scheduleDeletion(roomId, io)
+      return { roomId, user, room, hostChanged: false, voteUpdated: false }
+    }
   }
 
   // Re-elect conductor immediately — no grace period
@@ -195,7 +198,7 @@ export function listRooms(): RoomListItem[] {
 
 export function updateSettings(
   roomId: string,
-  settings: { name?: string; password?: string | null; audioQuality?: AudioQuality },
+  settings: { name?: string; password?: string | null; audioQuality?: AudioQuality; isPersistent?: boolean },
 ): void {
   const room = roomRepo.get(roomId)
   if (!room) return
@@ -211,6 +214,10 @@ export function updateSettings(
 
   if (settings.audioQuality !== undefined) {
     room.audioQuality = settings.audioQuality
+  }
+
+  if (settings.isPersistent !== undefined) {
+    room.isPersistent = settings.isPersistent
   }
 }
 

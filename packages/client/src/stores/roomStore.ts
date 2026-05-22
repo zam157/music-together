@@ -17,6 +17,8 @@ interface RoomStore {
   currentUser: User | null
   /** 房间密码明文（从 ROOM_SETTINGS 事件接收） */
   roomPassword: string | null
+  /** 房间是否持久化 */
+  isPersistent: boolean | null
 
   setRoom: (room: RoomState | null) => void
   updateRoom: (partial: Partial<RoomState>) => void
@@ -30,6 +32,7 @@ export const useRoomStore = create<RoomStore>((set) => ({
   room: null,
   currentUser: null,
   roomPassword: null,
+  isPersistent: null,
 
   setRoom: (room) => set({ room, currentUser: deriveCurrentUser(room) }),
 
@@ -70,5 +73,5 @@ export const useRoomStore = create<RoomStore>((set) => ({
       return { room }
     }),
 
-  reset: () => set({ room: null, currentUser: null, roomPassword: null }),
+  reset: () => set({ room: null, currentUser: null, roomPassword: null, isPersistent: null }),
 }))

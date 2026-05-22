@@ -16,6 +16,8 @@ export interface RoomData {
   currentTrack: Track | null
   playState: PlayState
   playMode: PlayMode
+  /** 持久化房间：启用后在所有人离开房间后不会自动删除房间（只有房主可以设置，默认关闭） */
+  isPersistent: boolean
 }
 
 export interface SocketMapping {

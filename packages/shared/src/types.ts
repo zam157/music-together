@@ -71,6 +71,7 @@ export interface RoomState {
   creatorId: string
   hostId: string
   hasPassword: boolean
+  isPersistent: boolean | null
   /** 密码明文（仅房间内成员可见） */
   password?: string | null
   audioQuality: AudioQuality
