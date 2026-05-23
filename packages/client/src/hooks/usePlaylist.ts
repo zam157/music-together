@@ -80,11 +80,13 @@ export function usePlaylist() {
     netease: [],
     tencent: [],
     kugou: [],
+    'netease-voice': [],
   })
   const [playlistsLoading, setPlaylistsLoading] = useState<Record<MusicSource, boolean>>({
     netease: false,
     tencent: false,
     kugou: false,
+    'netease-voice': false,
   })
 
   // Paginated playlist tracks state

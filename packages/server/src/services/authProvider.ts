@@ -59,4 +59,5 @@ export const AUTH_PROVIDERS: Record<MusicSource, AuthProvider> = {
   netease: neteaseAuth,
   kugou: kugouAuth,
   tencent: tencentAuth,
+  'netease-voice': neteaseAuth, // 网易云声音使用网易云账号体系
 }

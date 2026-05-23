@@ -79,7 +79,18 @@ export function useRoomState() {
       store.updateRoom({ users: updatedUsers })
     }
 
-    const sourceLabel = (source: 'netease' | 'tencent') => (source === 'netease' ? '网易云' : 'QQ音乐')
+    const sourceLabel = (source: 'netease' | 'tencent' | 'netease-voice') => {
+      switch (source) {
+        case 'netease':
+          return '网易云'
+        case 'tencent':
+          return 'QQ音乐'
+        case 'netease-voice':
+          return '网易云声音'
+        default:
+          return source
+      }
+    }
 
     const onAutoFallback = (data: RoomAutoFallbackEvent) => {
       const id = `auto-fallback:${data.attemptId}`
