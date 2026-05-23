@@ -1,4 +1,4 @@
-import Meting from '../utils/meting/meting'
+import Meting from '../utils/meting/meting.js'
 import { get as kugouLrcGet, Format } from '@s4p/kugou-lrc'
 import type { KrcInfo } from '@s4p/kugou-lrc'
 import type { MusicSource, Track } from '@music-together/shared'

@@ -1,7 +1,7 @@
 import crypto from 'crypto'
 import type { ApiConfig, RequestHeaders, FormattedTrack } from './base'
-import BaseProvider from './base'
-import { createWeapiEncryptedPayload } from '../../crypto'
+import BaseProvider from './base.js'
+import { createWeapiEncryptedPayload } from '../../crypto.js'
 
 // eapi 相关常量
 const EAPI_KEY = 'e82ckenh8dichen8'

@@ -8,7 +8,7 @@
  */
 
 import { URLSearchParams } from 'url'
-import ProviderFactory from './providers/index'
+import ProviderFactory from './providers/index.js'
 import type BaseProvider from './providers/base'
 
 interface RequestInfo {

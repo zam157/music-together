@@ -1,5 +1,5 @@
 import type { ApiConfig, FormattedTrack } from "./base";
-import NeteaseProvider from "./netease";
+import NeteaseProvider from "./netease.js";
 
 export default class NeteaseVoiceProvider extends NeteaseProvider {
   protected name = 'netease-voice'

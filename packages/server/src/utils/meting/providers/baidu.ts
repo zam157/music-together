@@ -1,6 +1,6 @@
 import crypto from 'crypto'
 import type { ApiConfig, RequestHeaders, FormattedTrack } from './base'
-import BaseProvider from './base'
+import BaseProvider from './base.js'
 
 /**
  * 百度音乐平台提供者

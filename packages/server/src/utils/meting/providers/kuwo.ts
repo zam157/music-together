@@ -1,5 +1,5 @@
 import type { ApiConfig, RequestHeaders, FormattedTrack } from './base'
-import BaseProvider from './base'
+import BaseProvider from './base.js'
 
 /**
  * 酷我音乐平台提供者

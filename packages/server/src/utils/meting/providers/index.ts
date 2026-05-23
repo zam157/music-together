@@ -1,10 +1,10 @@
-import NeteaseProvider from './netease'
-import TencentProvider from './tencent'
-import KugouProvider from './kugou'
-import BaiduProvider from './baidu'
-import KuwoProvider from './kuwo'
-import NeteaseVoiceProvider from './netease-voice'
-import type BaseProvider from './base'
+import NeteaseProvider from './netease.js'
+import TencentProvider from './tencent.js'
+import KugouProvider from './kugou.js'
+import BaiduProvider from './baidu.js'
+import KuwoProvider from './kuwo.js'
+import NeteaseVoiceProvider from './netease-voice.js'
+import type BaseProvider from './base.js'
 
 type ProviderConstructor = new (meting: any) => BaseProvider
 
