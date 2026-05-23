@@ -24,7 +24,7 @@ const SOURCE_STYLE: Record<MusicSource, { label: string; className: string }> = 
   netease: { label: '网易', className: 'text-white bg-red-500 ring-red-600/50' },
   tencent: { label: 'QQ', className: 'text-white bg-green-500 ring-green-600/50' },
   kugou: { label: '酷狗', className: 'text-white bg-blue-500 ring-blue-600/50' },
-  'netease-voice': { label: '网易云声音', className: 'text-white bg-red-500 ring-red-600/50' },
+  'netease-voice': { label: '声音', className: 'text-white bg-red-500 ring-red-600/50' },
 }
 
 interface QueueDrawerProps {
@@ -293,7 +293,7 @@ export function QueueDrawer({ open, onOpenChange, onRemoveFromQueue, onReorderQu
                     {track.requestedBy && (
                       <Badge
                         variant="outline"
-                        className="absolute right-2 top-1.5 z-10 h-4 gap-0.5 border-primary/30 bg-primary/10 px-1.5 py-0 text-[10px] font-normal text-primary"
+                        className="self-start mr-2 mt-1.5 z-10 h-4 gap-0.5 border-primary/30 bg-primary/10 px-1.5 py-0 text-[10px] font-normal text-primary"
                       >
                         <User className="h-2.5 w-2.5" />
                         {track.requestedBy}
