@@ -52,7 +52,10 @@ export const useRoomStore = create<RoomStore>((set) => ({
   addUser: (user) =>
     set((state) => {
       if (!state.room) return {}
-      const room = { ...state.room, users: [...state.room.users, user] }
+      const users = state.room.users.some((u) => u.id === user.id)
+        ? state.room.users.map((u) => (u.id === user.id ? user : u))
+        : [...state.room.users, user]
+      const room = { ...state.room, users }
       const myId = storage.getUserId()
       if (user.id === myId) {
         // The added user is us — derive our currentUser from the updated room

@@ -1,20 +1,32 @@
 import type { AudioQuality, ChatMessage, PlayMode, PlayState, RoomListItem, Track, User } from '@music-together/shared'
 
-/** 服务端内部房间数据模型 -- 含密码（永远不发送给客户端） */
+/** 服务端内部房间数据模型 -- 含密码（仅通过 owner 专用 RoomState 发送给客户端） */
 export interface RoomData {
   id: string
   name: string
   password: string | null
-  /** 房间创建者 ID（永久不变，创建者为 owner，加入时自动成为 conductor） */
+  /** 原始房间创建者 ID（永久不变；重新上线后恢复 owner 和当前房主身份） */
   creatorId: string
+  /** 当前在线主持人身份，同时承担自动下一首和投票否决职责 */
   hostId: string
+  /** 唯一允许提交播放进度的 Socket；同一身份多标签页时只有一个写入者 */
+  conductorSocketId: string | null
   /** 持久化 admin 用户 ID 集合（离开/回来自动恢复 admin） */
   adminUserIds: Set<string>
+  /** 无永久控制者在线时临时接管房间的用户；授予 admin 能力，不持久化 */
+  temporaryAdminUserId: string | null
   audioQuality: AudioQuality
   users: User[]
   queue: Track[]
   currentTrack: Track | null
   playState: PlayState
+  /** Latest scheduled action, kept separate until its execution time. */
+  pendingPlayback?: {
+    type: 'play' | 'pause' | 'resume' | 'seek' | 'stop'
+    track: Track | null
+    playState: PlayState & { serverTimeToExecute: number }
+    timer: ReturnType<typeof setTimeout>
+  } | null
   playMode: PlayMode
   /** 持久化房间：启用后在所有人离开房间后不会自动删除房间（只有房主可以设置，默认关闭） */
   isPersistent: boolean

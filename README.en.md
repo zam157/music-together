@@ -32,33 +32,33 @@
 
 ### Desktop
 
-| Home | Search | Player | Chat |
-|:---:|:---:|:---:|:---:|
+|            Home            |            Search            |            Player            |            Chat            |
+| :------------------------: | :--------------------------: | :--------------------------: | :------------------------: |
 | ![Home](screenshots/1.png) | ![Search](screenshots/2.png) | ![Player](screenshots/3.png) | ![Chat](screenshots/4.png) |
 
 ### Mobile
 
-| Home | Search | Player | Chat |
-|:---:|:---:|:---:|:---:|
+|             Home             |             Search             |             Player             |             Chat             |
+| :--------------------------: | :----------------------------: | :----------------------------: | :--------------------------: |
 | ![Home](screenshots/1_m.png) | ![Search](screenshots/2_m.png) | ![Player](screenshots/3_m.png) | ![Chat](screenshots/4_m.png) |
 
 ### Lyrics Display Comparison
 
-| Desktop Lyrics | Portrait Default (Cover) | Portrait Lyrics Mode |
-|:---:|:---:|:---:|
+|            Desktop Lyrics            |         Portrait Default (Cover)         |           Portrait Lyrics Mode           |
+| :----------------------------------: | :--------------------------------------: | :--------------------------------------: |
 | ![Desktop Lyrics](screenshots/3.png) | ![Portrait Default](screenshots/3_m.png) | ![Portrait Lyrics](screenshots/3_m1.png) |
 
 ## Features
 
 - **Real-time sync** -- NTP clock synchronization + scheduled execution for minimal latency
-- **Multi-platform music sources** -- NetEase Cloud Music, QQ Music
+- **Multi-platform music sources** -- NetEase Cloud Music, QQ Music, Kugou
 - **Apple Music-style lyrics** -- Word-by-word animated lyrics, responsive on desktop and mobile
-- **VIP song support** -- Room-scoped cookie pool via NetEase QR login
-- **RBAC permissions** -- Host > Admin > Member with fine-grained access control
+- **VIP song support** -- Room-scoped cookie pool via platform account login
+- **RBAC permissions** -- Owner > Admin > Member with fine-grained access control
+- **Temporary admin handoff** -- Non-empty rooms always keep an admin-capable online user
 - **Voting system** -- Members vote to control playback actions
 - **Play modes** -- Sequential, single loop, list loop, shuffle
 - **Real-time chat** -- In-room text messaging with system messages
-- **Role grace period** -- Privileged users retain roles for 30s after disconnect
 - **Mobile responsive** -- Adaptive layout with orientation-based switching
 
 ## Quick Start
@@ -119,16 +119,16 @@ packages/
 
 ## Acknowledgements
 
-| Library | Description |
-|---|---|
-| [Howler.js](https://github.com/goldfire/howler.js) | Web audio playback |
-| [Apple Music-like Lyrics](https://github.com/Steve-xmh/applemusic-like-lyrics) | Lyrics component (GPL-3.0) |
-| [Meting](https://github.com/metowolf/Meting) | Multi-platform music API |
-| [NeteaseCloudMusicApi Enhanced](https://github.com/NeteaseCloudMusicApiEnhanced/api-enhanced) | NetEase Cloud Music API |
-| [CASL](https://github.com/stalniy/casl) | Permission management |
-| [Zustand](https://github.com/pmndrs/zustand) | State management |
-| [shadcn/ui](https://github.com/shadcn-ui/ui) | UI component library |
-| [Motion](https://github.com/motiondivision/motion) | Animation library |
+| Library                                                                                       | Description                |
+| --------------------------------------------------------------------------------------------- | -------------------------- |
+| [Howler.js](https://github.com/goldfire/howler.js)                                            | Web audio playback         |
+| [Apple Music-like Lyrics](https://github.com/Steve-xmh/applemusic-like-lyrics)                | Lyrics component (GPL-3.0) |
+| [Meting](https://github.com/metowolf/Meting)                                                  | Multi-platform music API   |
+| [NeteaseCloudMusicApi Enhanced](https://github.com/NeteaseCloudMusicApiEnhanced/api-enhanced) | NetEase Cloud Music API    |
+| [CASL](https://github.com/stalniy/casl)                                                       | Permission management      |
+| [Zustand](https://github.com/pmndrs/zustand)                                                  | State management           |
+| [shadcn/ui](https://github.com/shadcn-ui/ui)                                                  | UI component library       |
+| [Motion](https://github.com/motiondivision/motion)                                            | Animation library          |
 
 ## License
 

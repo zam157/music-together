@@ -8,12 +8,21 @@ export function toPublicRoomState(data: RoomData): RoomState {
     name: data.name,
     creatorId: data.creatorId,
     hostId: data.hostId,
+    conductorSocketId: data.conductorSocketId,
     hasPassword: data.password !== null,
     audioQuality: data.audioQuality,
     users: data.users,
     queue: data.queue,
-    currentTrack: data.currentTrack,
-    playState: data.playState,
+    currentTrack: data.pendingPlayback ? data.pendingPlayback.track : data.currentTrack,
+    playState: data.pendingPlayback
+      ? {
+          isPlaying: data.pendingPlayback.playState.isPlaying,
+          currentTime: data.pendingPlayback.playState.currentTime,
+          serverTimestamp: data.pendingPlayback.playState.serverTimestamp,
+          revision: data.pendingPlayback.playState.revision,
+        }
+      : data.playState,
+    serverTimeToExecute: data.pendingPlayback?.playState.serverTimeToExecute,
     playMode: data.playMode,
     isPersistent: data.isPersistent,
   }

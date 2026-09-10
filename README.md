@@ -51,22 +51,24 @@
 ## 功能特性
 
 - **实时同步播放** -- 基于 NTP 时钟同步 + 定时执行，延迟极低
-- **多平台音源** -- 支持网易云音乐、QQ 音乐搜索与播放
+- **多平台音源** -- 支持网易云音乐、QQ 音乐、酷狗音乐搜索与播放
 - **Apple Music 风格歌词** -- 逐词高亮动画歌词，桌面端/移动端自适应
-- **VIP 歌曲支持** -- 网易云 QR 登录贡献 Cookie，解锁 VIP 曲目（房间级作用域）
+- **VIP 歌曲支持** -- 平台账号登录贡献 Cookie，解锁 VIP 曲目（房间级作用域）
 - **权限管理 (RBAC)** -- 房主 > 管理员 > 普通成员，细粒度权限控制
+- **临时管理员转移** -- 非空房间始终保留至少一个具备管理能力的在线用户
 - **投票系统** -- 普通成员通过投票控制切歌、暂停等操作
 - **播放模式** -- 顺序播放、单曲循环、列表循环、随机播放
 - **实时聊天** -- 房间内文字聊天，支持系统消息
-- **角色宽限期** -- 特权用户断线后保留角色 30 秒，重连自动恢复
 - **移动端适配** -- 响应式设计，横竖屏自动切换布局
 
 ## 快速开始
 
 ### 环境要求
 
-- Node.js >= 22
+- Node.js >= 24.15.0
 - pnpm >= 10
+
+生产部署必须设置至少 32 字符的随机 `IDENTITY_SECRET`；本地开发可使用默认开发配置。
 
 ### 安装与开发
 
@@ -75,6 +77,15 @@ git clone https://github.com/Yueby/music-together.git
 cd music-together
 pnpm install
 pnpm dev
+```
+
+提交代码前可运行：
+
+```bash
+pnpm test
+pnpm --filter @music-together/client typecheck
+pnpm --filter @music-together/client lint
+pnpm build
 ```
 
 前端: http://localhost:5173 | 后端: http://localhost:3001
@@ -86,6 +97,7 @@ Docker 单镜像部署：
 ```bash
 docker run -d --name music-together --restart unless-stopped \
   -p 3001:3001 \
+  -e IDENTITY_SECRET='<至少32字符的随机密钥>' \
   ghcr.io/yueby/music-together:latest
 ```
 
@@ -98,6 +110,7 @@ docker run -d --name music-together --restart unless-stopped \
 ```bash
 docker run -d --name music-together --restart unless-stopped \
   -p 3001:3001 \
+  -e IDENTITY_SECRET='<至少32字符的随机密钥>' \
   -e CLIENT_URL=https://music.example.com \
   ghcr.io/yueby/music-together:latest
 ```

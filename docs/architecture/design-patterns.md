@@ -118,7 +118,7 @@ Controller → Service → Repository / Utils
 
 - **Controller**：注册 Socket 事件监听器，薄编排层（校验输入 → 调用 Service → 编排通知）。不包含业务逻辑。
 - **Service**：业务逻辑、跨领域编排、Socket 广播。关键服务职责拆分：
-  - `roomService`：房间 CRUD + 角色管理 + conductor 选举（`electConductor`）+ 加入校验（`validateJoinRequest`）。Re-export `toPublicRoomState` 和 `broadcastRoomList` 以保持控制器调用方式不变。
+  - `roomService`：房间 CRUD + 角色管理 + 临时管理员协调（`reconcileRoomRoles`）+ conductor 选举（`electConductor`）+ 加入校验（`validateJoinRequest`）。Re-export `toPublicRoomState` 和 `broadcastRoomList` 以保持控制器调用方式不变。
   - `roomLifecycleService`：房间空置删除定时器 + 防抖广播。不依赖 `roomService`，消除循环依赖。API：`scheduleDeletion`、`cancelDeletionTimer`、`broadcastRoomList`、`clearAllTimers`。角色宽限期已移除（conductor 自动选举，无需 grace period）。
   - `playerService`：播放状态管理 + 流 URL 解析 + 切歌防抖 + 加入播放同步（`syncPlaybackToSocket`）+ 房间清理（`cleanupRoom`）。`playTrackInRoom` 通过 per-room Promise 链互斥锁防止并发竞态。`playNextTrackInRoom` / `playPrevTrackInRoom` 将 debounce + 队列导航 + 播放统一封装在 mutex 内部。`autoPlayIfEmpty` 在 mutex 内重新检查 `room.currentTrack`，防止并发 QUEUE_ADD 双重自动播放。
 - **Repository**：数据存取（当前为内存 Map，接口抽象，可替换为数据库）
@@ -186,7 +186,6 @@ LIMITS.QUEUE_MAX_SIZE // 100
 LIMITS.QUEUE_BATCH_MAX_SIZE // 100
 LIMITS.CHAT_HISTORY_MAX // 200
 TIMING.ROOM_GRACE_PERIOD_MS // 60_000
-TIMING.ROLE_GRACE_PERIOD_MS // 30_000
 TIMING.PLAYER_NEXT_DEBOUNCE_MS // 500
 TIMING.VOTE_TIMEOUT_MS // 30_000
 NTP.INITIAL_INTERVAL_MS // 50

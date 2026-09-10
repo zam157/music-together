@@ -1,12 +1,14 @@
 packages:
   - packages/*
 
-ignoredBuiltDependencies:
-  - '@applemusic-like-lyrics/core'
-  - '@applemusic-like-lyrics/lyric'
-  - '@applemusic-like-lyrics/react'
-  - '@swc/core'
-  - esbuild
-  - msw
+overrides:
+  '@modelcontextprotocol/sdk': 1.30.0
+  '@hono/node-server': 2.0.12
 
-onlyBuiltDependencies: esbuild
+allowBuilds:
+  '@applemusic-like-lyrics/core': false
+  '@applemusic-like-lyrics/lyric': false
+  '@applemusic-like-lyrics/react': false
+  '@swc/core': false
+  esbuild: true
+  msw: false

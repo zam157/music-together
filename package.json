@@ -1,24 +1,31 @@
 {
   "name": "music-together",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Online music listening together platform",
   "scripts": {
     "predev": "kill-port 3001 --silent || true",
-    "dev": "concurrently --kill-others --names server,client --prefix-colors blue,green \"pnpm run dev:server\" \"pnpm run dev:client\"",
-    "dev:client": "pnpm --filter @music-together/client dev",
-    "dev:server": "pnpm --filter @music-together/server dev",
-    "build": "pnpm -r run build",
+    "dev": "concurrently --kill-others --names server,client --prefix-colors blue,green \"corepack pnpm@11.21.0 run dev:server\" \"corepack pnpm@11.21.0 run dev:client\"",
+    "dev:client": "corepack pnpm@11.21.0 --filter @music-together/client dev",
+    "dev:server": "corepack pnpm@11.21.0 --filter @music-together/server dev",
+    "build": "corepack pnpm@11.21.0 -r run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "format": "prettier --write \"packages/*/src/**/*.{ts,tsx}\" \"packages/shared/src/**/*.ts\""
   },
   "keywords": [],
   "author": "",
   "license": "AGPL-3.0",
-  "packageManager": "pnpm@10.29.2",
+  "packageManager": "pnpm@11.21.0",
+  "engines": {
+    "node": ">=24.15.0",
+    "pnpm": ">=11"
+  },
   "devDependencies": {
-    "concurrently": "^9.2.1",
+    "concurrently": "^10.0.5",
     "kill-port": "^2.0.1",
-    "prettier": "^3.8.1"
+    "prettier": "^3.9.6",
+    "vitest": "^5.0.0"
   },
   "workspaces": [
     "packages/*"

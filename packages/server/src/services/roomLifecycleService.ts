@@ -10,8 +10,9 @@
  *   roomLifecycleService does NOT depend on roomService (no circular risk).
  *
  * Note: Role grace period has been removed. Owner role is permanent (based on creatorId),
- * admin is persisted via adminUserIds, and conductor (hostId) is auto-elected by
- * electConductor() in roomService whenever users join/leave.
+ * admin is persisted via adminUserIds, temporary admin is assigned when no permanent
+ * privileged user is online, and conductor (hostId) is auto-elected by electConductor()
+ * in roomService whenever users join/leave.
  */
 
 import type { RoomListItem } from '@music-together/shared'

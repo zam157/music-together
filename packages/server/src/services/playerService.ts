@@ -74,6 +74,45 @@ function scheduled(ps: PlayState, roomId: string, scheduleTime?: number): Schedu
   return { ...ps, serverTimeToExecute: scheduleTime ?? getScheduleTime(roomId) }
 }
 
+function getLatestPlayback(room: RoomData): { track: Track | null; playState: PlayState } {
+  return room.pendingPlayback
+    ? { track: room.pendingPlayback.track, playState: room.pendingPlayback.playState }
+    : { track: room.currentTrack, playState: room.playState }
+}
+
+function getNextRevision(room: RoomData): number {
+  return Math.max(room.playState.revision, room.pendingPlayback?.playState.revision ?? -1) + 1
+}
+
+function cancelPendingPlayback(room: RoomData): void {
+  if (room.pendingPlayback?.timer) clearTimeout(room.pendingPlayback.timer)
+  room.pendingPlayback = null
+}
+
+function schedulePlaybackCommit(
+  room: RoomData,
+  type: NonNullable<RoomData['pendingPlayback']>['type'],
+  track: Track | null,
+  playState: ScheduledPlayState,
+  onCommit?: () => void,
+): void {
+  cancelPendingPlayback(room)
+  const delay = Math.max(0, playState.serverTimeToExecute - Date.now())
+  const timer = setTimeout(() => {
+    if (room.pendingPlayback?.playState !== playState) return
+    room.currentTrack = track
+    room.playState = {
+      isPlaying: playState.isPlaying,
+      currentTime: playState.currentTime,
+      serverTimestamp: playState.serverTimestamp,
+      revision: playState.revision,
+    }
+    room.pendingPlayback = null
+    onCommit?.()
+  }, delay)
+  room.pendingPlayback = { type, track, playState, timer }
+}
+
 // ---------------------------------------------------------------------------
 // Audio quality fallback
 // ---------------------------------------------------------------------------
@@ -128,7 +167,7 @@ export function playTrackInRoom(io: TypedServer, roomId: string, track: Track): 
 export function autoPlayIfEmpty(io: TypedServer, roomId: string, track: Track): Promise<boolean> {
   return withPlayMutex(roomId, async () => {
     const room = roomRepo.get(roomId)
-    if (!room || room.currentTrack) return false
+    if (!room || getLatestPlayback(room).track) return false
     return _playTrackInRoom(io, roomId, track)
   })
 }
@@ -180,7 +219,12 @@ async function _playTrackInRoom(io: TypedServer, roomId: string, track: Track): 
               const best = await trackFallbackService.findBestAlternativeTrack(resolved, toSource)
               if (best) {
                 const cookie2 = authService.getAnyCookie(best.track.source, roomId)
-                const url2 = await resolveStreamUrl(best.track.source, best.track.urlId, room.audioQuality, cookie2 ?? undefined)
+                const url2 = await resolveStreamUrl(
+                  best.track.source,
+                  best.track.urlId,
+                  room.audioQuality,
+                  cookie2 ?? undefined,
+                )
                 if (url2) {
                   const replacement: Track = {
                     ...best.track,
@@ -259,6 +303,11 @@ async function _playTrackInRoom(io: TypedServer, roomId: string, track: Track): 
     }
   }
 
+  // The track may have been removed while an external stream/cover request was
+  // in flight. Never commit a queue item that no longer exists.
+  const roomBeforeCommit = roomRepo.get(roomId)
+  if (!roomBeforeCommit || !roomBeforeCommit.queue.some((item) => item.id === resolved.id)) return false
+
   // Fetch cover if missing
   if (!resolved.cover && resolved.picId) {
     try {
@@ -269,19 +318,28 @@ async function _playTrackInRoom(io: TypedServer, roomId: string, track: Track): 
     }
   }
 
+  // Re-check after cover resolution too; queue removal can happen during either
+  // external request.
+  if (!roomRepo.get(roomId)?.queue.some((item) => item.id === resolved.id)) return false
+
   // Update room state — align serverTimestamp with the scheduled execution time
   // so that estimateCurrentTime() is accurate before the first conductor report.
-  room.currentTrack = resolved
   const scheduleTime = getScheduleTime(roomId)
-  room.playState = {
-    isPlaying: true,
-    currentTime: 0,
-    serverTimestamp: scheduleTime,
-  }
+  const playState = scheduled(
+    {
+      isPlaying: true,
+      currentTime: 0,
+      serverTimestamp: scheduleTime,
+      revision: getNextRevision(room),
+    },
+    roomId,
+    scheduleTime,
+  )
+  schedulePlaybackCommit(room, 'play', resolved, playState)
 
   io.to(roomId).emit(EVENTS.PLAYER_PLAY, {
     track: resolved,
-    playState: scheduled(room.playState, roomId, scheduleTime),
+    playState,
   })
 
   // 通知大厅用户当前播放曲目变化
@@ -293,38 +351,80 @@ async function _playTrackInRoom(io: TypedServer, roomId: string, track: Track): 
 
 export function resumeTrack(io: TypedServer, roomId: string, _initiatorSocket?: TypedSocket): void {
   const room = roomRepo.get(roomId)
-  if (!room || !room.currentTrack) return
+  if (!room) return
+  const latest = getLatestPlayback(room)
+  if (!latest.track) return
 
   const scheduleTime = getScheduleTime(roomId)
-  room.playState = { ...room.playState, isPlaying: true, serverTimestamp: scheduleTime }
-  // All clients (including initiator) must execute at the same scheduled moment
-  io.to(roomId).emit(EVENTS.PLAYER_RESUME, { playState: scheduled(room.playState, roomId, scheduleTime) })
+  const playState = scheduled(
+    {
+      ...latest.playState,
+      isPlaying: true,
+      serverTimestamp: scheduleTime,
+      revision: getNextRevision(room),
+    },
+    roomId,
+    scheduleTime,
+  )
+  schedulePlaybackCommit(room, 'resume', latest.track, playState)
+  io.to(roomId).emit(EVENTS.PLAYER_RESUME, { playState })
 }
 
 export function pauseTrack(io: TypedServer, roomId: string, _initiatorSocket?: TypedSocket): void {
   const room = roomRepo.get(roomId)
   if (!room) return
 
-  // Snapshot estimated position before pausing so resume starts from the correct point
-  const snapshotTime = estimateCurrentTime(roomId)
-  room.playState = { isPlaying: false, currentTime: snapshotTime, serverTimestamp: Date.now() }
-  // All clients must pause at the same scheduled moment
-  io.to(roomId).emit(EVENTS.PLAYER_PAUSE, { playState: scheduled(room.playState, roomId) })
+  const latest = getLatestPlayback(room)
+  if (!latest.track) return
+  const scheduleTime = getScheduleTime(roomId)
+  // Base replacements on the latest planned state, not an older committed action.
+  const effectiveStartTime = Math.max(Date.now(), latest.playState.serverTimestamp)
+  const delaySec = latest.playState.isPlaying ? Math.max(0, (scheduleTime - effectiveStartTime) / 1000) : 0
+  const latestElapsed = latest.playState.isPlaying
+    ? Math.max(0, (Date.now() - latest.playState.serverTimestamp) / 1000)
+    : 0
+  const snapshotTime = Math.min(
+    latest.track.duration > 0 ? latest.track.duration : Number.POSITIVE_INFINITY,
+    latest.playState.currentTime + latestElapsed + delaySec,
+  )
+  const playState = scheduled(
+    {
+      isPlaying: false,
+      currentTime: snapshotTime,
+      serverTimestamp: scheduleTime,
+      revision: getNextRevision(room),
+    },
+    roomId,
+    scheduleTime,
+  )
+  schedulePlaybackCommit(room, 'pause', latest.track, playState)
+  io.to(roomId).emit(EVENTS.PLAYER_PAUSE, { playState })
 }
 
 export function seekTrack(io: TypedServer, roomId: string, currentTime: number, _initiatorSocket?: TypedSocket): void {
+  if (!Number.isFinite(currentTime) || currentTime < 0) return
   const room = roomRepo.get(roomId)
   if (!room) return
 
+  const latest = getLatestPlayback(room)
+  if (!latest.track) return
   const scheduleTime = getScheduleTime(roomId)
-  // When playing, align serverTimestamp with scheduled time so estimateCurrentTime() is accurate
-  room.playState = {
-    ...room.playState,
-    currentTime,
-    serverTimestamp: room.playState.isPlaying ? scheduleTime : Date.now(),
-  }
-  // All clients must seek at the same scheduled moment
-  io.to(roomId).emit(EVENTS.PLAYER_SEEK, { playState: scheduled(room.playState, roomId, scheduleTime) })
+  // Duration metadata can be missing (0) for some sources; retain finite,
+  // non-negative validation without imposing an arbitrary upper bound.
+  const seekCap = latest.track.duration > 0 ? latest.track.duration : Number.POSITIVE_INFINITY
+  const clampedTime = Math.min(Math.max(0, currentTime), seekCap)
+  const playState = scheduled(
+    {
+      ...latest.playState,
+      currentTime: clampedTime,
+      serverTimestamp: latest.playState.isPlaying ? scheduleTime : Date.now(),
+      revision: getNextRevision(room),
+    },
+    roomId,
+    scheduleTime,
+  )
+  schedulePlaybackCommit(room, 'seek', latest.track, playState)
+  io.to(roomId).emit(EVENTS.PLAYER_SEEK, { playState })
 }
 
 export function updatePlayState(roomId: string, update: Partial<PlayState>): void {
@@ -337,11 +437,13 @@ export function updatePlayState(roomId: string, update: Partial<PlayState>): voi
 export function setCurrentTrack(roomId: string, track: Track | null): void {
   const room = roomRepo.get(roomId)
   if (room) {
+    cancelPendingPlayback(room)
     room.currentTrack = track
     room.playState = {
       isPlaying: track !== null,
       currentTime: 0,
       serverTimestamp: Date.now(),
+      revision: getNextRevision(room),
     }
   }
 }
@@ -352,15 +454,25 @@ export function setCurrentTrack(roomId: string, track: Track | null): void {
  * Used when no next track is available (queue empty, track removed, queue cleared).
  */
 export function stopPlayback(io: TypedServer, roomId: string): void {
-  setCurrentTrack(roomId, null)
-  io.to(roomId).emit(EVENTS.PLAYER_PAUSE, {
-    playState: { isPlaying: false, currentTime: 0, serverTimestamp: Date.now(), serverTimeToExecute: Date.now() },
-  })
   const room = roomRepo.get(roomId)
-  if (room) {
+  if (!room) return
+
+  const scheduleTime = getScheduleTime(roomId)
+  const playState = scheduled(
+    {
+      isPlaying: false,
+      currentTime: 0,
+      serverTimestamp: scheduleTime,
+      revision: getNextRevision(room),
+    },
+    roomId,
+    scheduleTime,
+  )
+  schedulePlaybackCommit(room, 'stop', null, playState, () => {
     io.to(roomId).emit(EVENTS.ROOM_STATE, toPublicRoomState(room))
-  }
-  broadcastRoomList(io)
+    broadcastRoomList(io)
+  })
+  io.to(roomId).emit(EVENTS.PLAYER_PAUSE, { playState })
 }
 
 /**
@@ -391,9 +503,9 @@ export function playNextTrackInRoom(
 ): Promise<void> {
   return withPlayMutex(roomId, async () => {
     if (options?.skipDebounce) {
-      // Still update the timestamp so a normal NEXT right after is debounced
-      lastNextTimestamp.set(roomId, Date.now())
-    } else if (_isNextDebounced(roomId)) {
+      // Still debounce an immediate duplicate NEXT, but never the opposite direction.
+      lastSkipTimestamp.set(roomId, { action: 'next', timestamp: Date.now() })
+    } else if (_isSkipDebounced(roomId, 'next')) {
       return
     }
 
@@ -413,7 +525,7 @@ export function playNextTrackInRoom(
     // Without this, a second PLAYER_NEXT waiting on the mutex could pass
     // the debounce check if _playTrackInRoom took longer than 500ms (e.g.
     // stream URL resolution), causing a double-skip.
-    lastNextTimestamp.set(roomId, Date.now())
+    lastSkipTimestamp.set(roomId, { action: 'next', timestamp: Date.now() })
   })
 }
 
@@ -427,8 +539,8 @@ export function playPrevTrackInRoom(
 ): Promise<void> {
   return withPlayMutex(roomId, async () => {
     if (options?.skipDebounce) {
-      lastNextTimestamp.set(roomId, Date.now())
-    } else if (_isNextDebounced(roomId)) {
+      lastSkipTimestamp.set(roomId, { action: 'prev', timestamp: Date.now() })
+    } else if (_isSkipDebounced(roomId, 'prev')) {
       return
     }
 
@@ -442,7 +554,7 @@ export function playPrevTrackInRoom(
     }
 
     // Refresh debounce timestamp after async work (same rationale as playNextTrackInRoom)
-    lastNextTimestamp.set(roomId, Date.now())
+    lastSkipTimestamp.set(roomId, { action: 'prev', timestamp: Date.now() })
   })
 }
 
@@ -462,13 +574,33 @@ export async function syncPlaybackToSocket(
 ): Promise<void> {
   const isAloneInRoom = room.users.length === 1
 
-  if (room.currentTrack?.streamUrl) {
-    // Alone in room + track was paused → auto-resume (user rejoining)
-    const shouldAutoPlay = isAloneInRoom || room.playState.isPlaying
+  const pending = room.pendingPlayback
+  if (pending) {
+    if (pending.track?.streamUrl) {
+      socket.emit(EVENTS.PLAYER_PLAY, {
+        track: pending.track,
+        playState: pending.playState,
+      })
+    }
+    if (pending.type === 'stop' || pending.type === 'pause' || pending.type === 'seek') {
+      const event = pending.type === 'stop' || pending.type === 'pause' ? EVENTS.PLAYER_PAUSE : EVENTS.PLAYER_SEEK
+      socket.emit(event, { playState: pending.playState })
+    } else if (pending.type === 'resume') {
+      socket.emit(EVENTS.PLAYER_RESUME, { playState: pending.playState })
+    }
+    return
+  } else if (room.currentTrack?.streamUrl) {
+    // Alone in room + track was paused → schedule the same auto-resume used by direct controls.
     if (isAloneInRoom && !room.playState.isPlaying) {
-      room.playState = { ...room.playState, isPlaying: true, serverTimestamp: Date.now() }
+      resumeTrack(io, roomId)
+      const resumeState = room.pendingPlayback?.playState
+      if (resumeState) {
+        socket.emit(EVENTS.PLAYER_PLAY, { track: room.currentTrack, playState: resumeState })
+      }
+      return
     }
 
+    const shouldAutoPlay = room.playState.isPlaying
     const snapshotCurrentTime = estimateCurrentTime(roomId)
     const snapshotTimestamp = Date.now()
     const joinCalibrationDelayMs = NTP.INITIAL_INTERVAL_MS * NTP.MAX_INITIAL_SAMPLES + 100
@@ -476,14 +608,19 @@ export async function syncPlaybackToSocket(
       ? Math.max(getScheduleTime(roomId), snapshotTimestamp + joinCalibrationDelayMs)
       : snapshotTimestamp
     const delaySec = shouldAutoPlay ? Math.max(0, (scheduleTime - snapshotTimestamp) / 1000) : 0
+    const scheduledCurrentTime = Math.min(
+      room.currentTrack.duration > 0 ? room.currentTrack.duration : Number.POSITIVE_INFINITY,
+      snapshotCurrentTime + delaySec,
+    )
 
     socket.emit(EVENTS.PLAYER_PLAY, {
       track: room.currentTrack,
       playState: {
         isPlaying: shouldAutoPlay,
-        currentTime: snapshotCurrentTime + delaySec,
+        currentTime: scheduledCurrentTime,
         serverTimestamp: scheduleTime,
         serverTimeToExecute: scheduleTime,
+        revision: room.playState.revision,
       },
     })
   } else if (isAloneInRoom && room.queue.length > 0) {
@@ -497,55 +634,30 @@ export async function syncPlaybackToSocket(
 // Room cleanup, debounce & conductor report validation
 // ---------------------------------------------------------------------------
 
-/** Debounce tracking for PLAYER_NEXT per room */
-const lastNextTimestamp = new Map<string, number>()
+/** Debounce repeated skip actions without blocking an immediate direction reversal. */
+const lastSkipTimestamp = new Map<string, { action: 'next' | 'prev'; timestamp: number }>()
 
-/** Track consecutive rejected conductor reports per room to break deadlocks */
-const conductorRejectCount = new Map<string, number>()
-
-/** Force-accept a conductor report after this many consecutive rejections */
-const CONDUCTOR_REJECT_FORCE_ACCEPT_COUNT = 2
-
-/** Max allowed drift (seconds) between conductor-reported time and server estimate */
+/** Max allowed backward drift (seconds) between conductor report and server estimate. */
 const CONDUCTOR_REJECT_DRIFT_THRESHOLD_S = 3
 
 /** Remove per-room entries for a deleted room */
 export function cleanupRoom(roomId: string): void {
-  lastNextTimestamp.delete(roomId)
-  conductorRejectCount.delete(roomId)
+  lastSkipTimestamp.delete(roomId)
   playMutexes.delete(roomId)
+  const room = roomRepo.get(roomId)
+  if (room) cancelPendingPlayback(room)
 }
 
-/**
- * Validate a conductor sync report against the server estimate.
- * Returns true if the report should be ACCEPTED, false if rejected (stale).
- * Automatically force-accepts after CONDUCTOR_REJECT_FORCE_ACCEPT consecutive
- * rejections to break deadlocks when the server estimate has diverged.
- */
-export function validateConductorReport(roomId: string, reportedTime: number, estimatedTime: number): boolean {
-  if (estimatedTime - reportedTime > CONDUCTOR_REJECT_DRIFT_THRESHOLD_S) {
-    const count = (conductorRejectCount.get(roomId) ?? 0) + 1
-    conductorRejectCount.set(roomId, count)
-    if (count < CONDUCTOR_REJECT_FORCE_ACCEPT_COUNT) {
-      return false // reject
-    }
-    // Too many consecutive rejections — force accept to break deadlock
-    logger.warn(`Force-accepting conductor report after ${count} consecutive rejections`, { roomId })
-  }
-  // Accepted — reset counter
-  conductorRejectCount.delete(roomId)
-  return true
+/** Reject reports that would move the authoritative room position backwards by seconds. */
+export function validateConductorReport(_roomId: string, reportedTime: number, estimatedTime: number): boolean {
+  return estimatedTime - reportedTime <= CONDUCTOR_REJECT_DRIFT_THRESHOLD_S
 }
 
-/**
- * Check and update the next-track debounce for a room.
- * Returns true if the action should be SKIPPED (too soon), false if allowed.
- * Internal: called inside mutex to prevent same-tick race conditions.
- */
-function _isNextDebounced(roomId: string): boolean {
+/** Debounce only duplicate NEXT or duplicate PREV actions for a room. */
+function _isSkipDebounced(roomId: string, action: 'next' | 'prev'): boolean {
   const now = Date.now()
-  const lastNext = lastNextTimestamp.get(roomId) ?? 0
-  if (now - lastNext < config.player.nextDebounceMs) return true
-  lastNextTimestamp.set(roomId, now)
+  const last = lastSkipTimestamp.get(roomId)
+  if (last?.action === action && now - last.timestamp < config.player.nextDebounceMs) return true
+  lastSkipTimestamp.set(roomId, { action, timestamp: now })
   return false
 }
