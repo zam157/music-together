@@ -238,6 +238,7 @@ const COVER_REQUEST_SIZES: Record<MusicSource, number> = {
   netease: 800,
   tencent: 800,
   kugou: 5000,
+  "netease-voice": 800,
 }
 
 function getCoverRequestSize(source: MusicSource, size?: number): number {
